@@ -1,0 +1,38 @@
+# === Java / Maven ===
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# === IDE ===
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Build Output ===
+bin/
+out/
+
+# === Index & Data (generated at runtime) ===
+index/index.dat
+index/index.txt
+index/search_result.txt
+data/
+
+# === Node / React ===
+node_modules/
+dist/
+.env.local
+.env.*.local
+*.tsbuildinfo
+
+# === Logs ===
+*.log

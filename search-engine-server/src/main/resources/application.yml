@@ -1,0 +1,18 @@
+server:
+  port: 8080
+
+search-engine:
+  document-dir: ./data/documents/
+  index-dir: ./data/index/
+  index-file: index.dat
+  upload-max-size: 10MB
+  ignore-case: true
+  term-filter-pattern: "[a-zA-Z]+"
+  term-min-length: 3
+  term-max-length: 20
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
