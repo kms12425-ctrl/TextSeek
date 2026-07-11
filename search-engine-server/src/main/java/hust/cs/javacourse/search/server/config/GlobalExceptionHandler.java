@@ -9,34 +9,28 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
-/**
- * 全局异常处理
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /** 文件大小超限 */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
     public ApiResult<Void> handleMaxUploadSize(MaxUploadSizeExceededException e) {
         return ApiResult.error(413, "文件大小超过限制");
     }
 
-    /** 未预期的运行时异常 */
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResult<Void> handleRuntime(RuntimeException e) {
-        log.error("未预期异常", e);
+        log.error("Unexpected runtime exception", e);
         return ApiResult.internalError("服务器内部错误: " + e.getMessage());
     }
 
-    /** 兜底 */
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResult<Void> handleAll(Exception e) {
-        log.error("未知异常", e);
+        log.error("Unhandled exception", e);
         return ApiResult.internalError("服务器内部错误");
     }
 }

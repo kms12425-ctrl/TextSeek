@@ -1,0 +1,3 @@
+﻿search engine enables fast search results.
+react frontend sends requests to spring boot backend.
+search engine project test document.

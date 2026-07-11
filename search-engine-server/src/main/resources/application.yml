@@ -12,6 +12,9 @@ search-engine:
   term-max-length: 20
 
 spring:
+  web:
+    resources:
+      static-locations: classpath:/static/,file:./static/,file:/app/static/
   servlet:
     multipart:
       max-file-size: 10MB

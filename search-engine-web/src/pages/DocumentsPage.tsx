@@ -1,90 +1,129 @@
 import { useEffect, useState } from 'react';
-import { Upload, Button, Table, Popconfirm, message, Typography, Space, Card } from 'antd';
-import { UploadOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
-import { listDocuments, uploadDocument, deleteDocument } from '../api/search';
+import { useNavigate } from 'react-router-dom';
+import { deleteDocument, listDocuments, uploadDocument } from '../api/search';
 import type { DocInfo } from '../api/types';
 
-const { Title } = Typography;
+export default function DocumentsPage() {
+  const navigate = useNavigate();
+  const [docs, setDocs] = useState<DocInfo[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-export default function DocumentsPage()
-{
-    const [docs, setDocs] = useState<DocInfo[]>([]);
-    const [loading, setLoading] = useState(false);
+  const fetchDocs = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await listDocuments();
+      setDocs(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '获取文档列表失败');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const fetchDocs = async () =>
-    {
-        setLoading(true);
-        try {
-            const data = await listDocuments();
-            setDocs(data);
-        } finally {
-            setLoading(false);
-        }
-    };
+  useEffect(() => {
+    void fetchDocs();
+  }, []);
 
-    useEffect(() => { fetchDocs(); }, []);
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
 
-    const handleUpload = async (file: File) =>
-    {
-        try {
-            await uploadDocument(file);
-            message.success(`上传成功: ${file.name}`);
-            fetchDocs();
-        } catch {
-            message.error(`上传失败: ${file.name}`);
-        }
-        return false; // 阻止默认上传行为
-    };
+    setMessage(null);
+    setError(null);
+    try {
+      await uploadDocument(file);
+      setMessage(`上传成功: ${file.name}`);
+      await fetchDocs();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `上传失败: ${file.name}`);
+    } finally {
+      event.target.value = '';
+    }
+  };
 
-    const handleDelete = async (docId: number) =>
-    {
-        await deleteDocument(docId);
-        message.success('已删除');
-        fetchDocs();
-    };
+  const handleDelete = async (docId: number) => {
+    const confirmed = window.confirm('确定删除该文档吗？');
+    if (!confirmed) {
+      return;
+    }
 
-    const columns: ColumnsType<DocInfo> = [
-        { title: 'ID', dataIndex: 'docId', key: 'docId', width: 80 },
-        { title: '文件名', dataIndex: 'docName', key: 'docName', ellipsis: true },
-        { title: '词条数', dataIndex: 'termCount', key: 'termCount', width: 100 },
-        {
-            title: '操作',
-            key: 'action',
-            width: 100,
-            render: (_, record) => (
-                <Popconfirm title="确定删除？" onConfirm={() => handleDelete(record.docId)}>
-                    <Button type="link" danger icon={<DeleteOutlined />}>删除</Button>
-                </Popconfirm>
-            ),
-        },
-    ];
+    setMessage(null);
+    setError(null);
+    try {
+      await deleteDocument(docId);
+      setMessage('已删除');
+      await fetchDocs();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '删除失败');
+    }
+  };
 
-    return (
-        <div>
-            <Title level={3} style={{ marginBottom: 24 }}>文档管理</Title>
+  return (
+    <section className="section-stack">
+      <div>
+        <h2 className="page-title">文档管理</h2>
+        <p className="page-subtitle">上传、查看和删除已经建立索引的文本文件。</p>
+      </div>
 
-            <Card style={{ marginBottom: 24 }}>
-                <Space>
-                    <Upload
-                        accept=".txt"
-                        showUploadList={false}
-                        beforeUpload={(file) => { handleUpload(file); return false; }}
-                    >
-                        <Button type="primary" icon={<UploadOutlined />}>上传 .txt 文档</Button>
-                    </Upload>
-                    <Button icon={<ReloadOutlined />} onClick={fetchDocs}>刷新列表</Button>
-                </Space>
-            </Card>
+      <div className="toolbar-card">
+        <label className="primary-button file-button">
+          上传 .txt 文档
+          <input type="file" accept=".txt" onChange={handleUpload} hidden />
+        </label>
+        <button type="button" className="secondary-button" onClick={() => void fetchDocs()} disabled={loading}>
+          刷新列表
+        </button>
+      </div>
 
-            <Table
-                columns={columns}
-                dataSource={docs}
-                rowKey="docId"
-                loading={loading}
-                pagination={{ pageSize: 10 }}
-                locale={{ emptyText: '暂无文档，请上传 .txt 文件' }}
-            />
-        </div>
-    );
+      {message && <div className="banner banner-success">{message}</div>}
+      {error && <div className="banner banner-error">{error}</div>}
+
+      <div className="table-card">
+        {loading ? (
+          <div className="loading-state">文档加载中...</div>
+        ) : docs.length === 0 ? (
+          <div className="empty-state">暂无文档，请先上传 .txt 文件</div>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>文件名</th>
+                  <th>词条数</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {docs.map((doc) => (
+                  <tr key={doc.docId}>
+                    <td>{doc.docId}</td>
+                    <td className="cell-ellipsis" title={doc.docName}>
+                      {doc.docName}
+                    </td>
+                    <td>{doc.termCount}</td>
+                    <td>
+                      <div className="inline-actions">
+                        <button type="button" className="link-button" onClick={() => navigate(`/documents/${doc.docId}`)}>
+                          查看
+                        </button>
+                        <button type="button" className="link-button danger-text" onClick={() => void handleDelete(doc.docId)}>
+                          删除
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }

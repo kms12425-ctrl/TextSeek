@@ -1,107 +1,142 @@
 import { useState } from 'react';
-import { Input, Button, Radio, Space, Card, Tag, Pagination, Empty, Typography } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
 import { search } from '../api/search';
 import type { HitItem, SearchResponse } from '../api/types';
 
-const { Title, Text } = Typography;
+function escapeRegex(term: string) {
+  return term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-export default function HomePage()
-{
-    const [keyword, setKeyword] = useState('');
-    const [mode, setMode] = useState<'or' | 'and'>('or');
-    const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState<SearchResponse | null>(null);
-    const [page, setPage] = useState(0);
-    const pageSize = 10;
+function renderHighlightedSnippet(hit: HitItem) {
+  if (!hit.snippet) {
+    return null;
+  }
 
-    const doSearch = async (p: number = 0) =>
-    {
-        if (!keyword.trim()) return;
-        setLoading(true);
-        try {
-            const res = await search(keyword.trim(), mode, p, pageSize);
-            setResult(res);
-            setPage(p);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const terms = Object.keys(hit.termFreqMap).filter(Boolean);
+  if (terms.length === 0) {
+    return <span>{hit.snippet}</span>;
+  }
 
-    return (
-        <div>
-            <Title level={3} style={{ marginBottom: 24 }}>全文搜索</Title>
+  const pattern = new RegExp(`(${terms.map(escapeRegex).join('|')})`, 'gi');
+  const parts = hit.snippet.split(pattern);
 
-            {/* 搜索栏 */}
-            <Space.Compact style={{ width: '100%', marginBottom: 16 }}>
-                <Input
-                    size="large"
-                    placeholder="输入搜索关键词（多个词用空格分隔）"
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    onPressEnter={() => doSearch(0)}
-                    prefix={<SearchOutlined />}
-                />
-                <Button type="primary" size="large" loading={loading} onClick={() => doSearch(0)}>
-                    搜索
-                </Button>
-            </Space.Compact>
+  return parts.map((part, index) => {
+    const matched = terms.some((term) => term.toLowerCase() === part.toLowerCase());
+    return matched ? <mark key={`${hit.docId}-${index}`}>{part}</mark> : <span key={`${hit.docId}-${index}`}>{part}</span>;
+  });
+}
 
-            <Radio.Group value={mode} onChange={(e) => setMode(e.target.value)} style={{ marginBottom: 24 }}>
-                <Radio.Button value="or">OR（包含任一词）</Radio.Button>
-                <Radio.Button value="and">AND（包含全部词）</Radio.Button>
-            </Radio.Group>
+export default function HomePage() {
+  const [keyword, setKeyword] = useState('');
+  const [mode, setMode] = useState<'or' | 'and'>('or');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<SearchResponse | null>(null);
+  const [page, setPage] = useState(0);
+  const pageSize = 10;
+  const totalPages = result ? Math.max(1, Math.ceil(result.totalHits / pageSize)) : 0;
 
-            {/* 结果统计 */}
-            {result && (
-                <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-                    找到 {result.totalHits} 条结果（第 {result.page + 1} 页，共 {Math.ceil(result.totalHits / pageSize)} 页）
-                </Text>
-            )}
+  const doSearch = async (nextPage = 0) => {
+    if (!keyword.trim()) {
+      return;
+    }
 
-            {/* 结果列表 */}
-            {result && result.hits.length === 0 && <Empty description="未找到匹配文档" />}
+    setLoading(true);
+    try {
+      const response = await search(keyword.trim(), mode, nextPage, pageSize);
+      setResult(response);
+      setPage(nextPage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            {result?.hits.map((hit: HitItem) => (
-                <Card
-                    key={hit.docId}
-                    size="small"
-                    style={{ marginBottom: 12 }}
-                    title={
-                        <Space>
-                            <Text strong>{hit.docName}</Text>
-                            <Tag color="blue">得分 {hit.score.toFixed(1)}</Tag>
-                        </Space>
-                    }
-                >
-                    {/* 高亮片段 */}
-                    <div
-                        style={{ marginBottom: 8, lineHeight: 1.8, color: '#555' }}
-                        dangerouslySetInnerHTML={{ __html: hit.snippet }}
-                    />
+  return (
+    <section className="section-stack">
+      <div>
+        <h2 className="page-title">全文搜索</h2>
+        <p className="page-subtitle">输入关键词，支持 AND / OR 两种匹配模式。</p>
+      </div>
 
-                    {/* 命中词频 */}
-                    <Space wrap>
-                        {Object.entries(hit.termFreqMap).map(([term, freq]) => (
-                            <Tag key={term} color="green">
-                                {term} × {freq}
-                            </Tag>
-                        ))}
-                    </Space>
-                </Card>
-            ))}
+      <div className="search-bar">
+        <input
+          className="text-input"
+          placeholder="输入搜索关键词，多词请用空格分隔"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              void doSearch(0);
+            }
+          }}
+        />
+        <button className="primary-button" type="button" onClick={() => void doSearch(0)} disabled={loading}>
+          {loading ? '搜索中...' : '搜索'}
+        </button>
+      </div>
 
-            {/* 分页 */}
-            {result && result.totalHits > pageSize && (
-                <Pagination
-                    current={page + 1}
-                    pageSize={pageSize}
-                    total={result.totalHits}
-                    onChange={(p) => doSearch(p - 1)}
-                    showSizeChanger={false}
-                    style={{ textAlign: 'center', marginTop: 24 }}
-                />
-            )}
+      <div className="segmented-control" role="radiogroup" aria-label="搜索模式">
+        <button
+          type="button"
+          className={`segment-button${mode === 'or' ? ' is-active' : ''}`}
+          onClick={() => setMode('or')}
+        >
+          OR（包含任一关键词）
+        </button>
+        <button
+          type="button"
+          className={`segment-button${mode === 'and' ? ' is-active' : ''}`}
+          onClick={() => setMode('and')}
+        >
+          AND（包含全部关键词）
+        </button>
+      </div>
+
+      {result && (
+        <p className="status-text">
+          找到 {result.totalHits} 条结果（第 {result.page + 1} 页，共 {totalPages} 页）
+        </p>
+      )}
+
+      {result && result.hits.length === 0 && <div className="empty-state">没有找到匹配文档</div>}
+
+      <div className="card-list">
+        {result?.hits.map((hit) => (
+          <article key={hit.docId} className="result-card">
+            <div className="result-header">
+              <strong>{hit.docName}</strong>
+              <span className="pill pill-blue">得分 {hit.score.toFixed(1)}</span>
+            </div>
+
+            <div className="snippet-text">{renderHighlightedSnippet(hit)}</div>
+
+            <div className="tag-row">
+              {Object.entries(hit.termFreqMap).map(([term, freq]) => (
+                <span key={term} className="pill pill-green">
+                  {term} × {freq}
+                </span>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {result && result.totalHits > pageSize && (
+        <div className="pager">
+          <button type="button" className="secondary-button" disabled={page === 0} onClick={() => void doSearch(page - 1)}>
+            上一页
+          </button>
+          <span className="status-text">
+            {page + 1} / {totalPages}
+          </span>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={page + 1 >= totalPages}
+            onClick={() => void doSearch(page + 1)}
+          >
+            下一页
+          </button>
         </div>
-    );
+      )}
+    </section>
+  );
 }

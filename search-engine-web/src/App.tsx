@@ -1,46 +1,46 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { ConfigProvider, Layout, theme } from 'antd';
-import HomePage from './pages/HomePage';
-import DocumentsPage from './pages/DocumentsPage';
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
+import './index.css';
 
-const { Header, Content } = Layout;
+const HomePage = lazy(() => import('./pages/HomePage'));
+const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
+const DocumentDetailPage = lazy(() => import('./pages/DocumentDetailPage'));
 
-function App()
-{
+function RouteFallback() {
   return (
-    <ConfigProvider
-      theme={{
-        algorithm: theme.defaultAlgorithm,
-        token: { colorPrimary: '#1677ff', borderRadius: 8 },
-      }}
-    >
-      <BrowserRouter>
-        <Layout style={{ minHeight: '100vh' }}>
-          <Header
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 24,
-              background: '#001529',
-            }}
-          >
-            <h1 style={{ color: '#fff', margin: 0, fontSize: 20, whiteSpace: 'nowrap' }}>
-              🔍 全文搜索引擎
-            </h1>
-            <nav style={{ display: 'flex', gap: 16 }}>
-              <a href="/" style={{ color: '#fff', textDecoration: 'none', fontSize: 15 }}>搜索</a>
-              <a href="/documents" style={{ color: '#fff', textDecoration: 'none', fontSize: 15 }}>文档管理</a>
-            </nav>
-          </Header>
-          <Content style={{ padding: '32px 48px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+    <div className="page-shell">
+      <div className="loading-state">页面加载中...</div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <div className="app-shell">
+        <header className="topbar">
+          <div className="brand">全文搜索引擎</div>
+          <nav className="topnav">
+            <NavLink to="/" end className={({ isActive }) => `topnav-link${isActive ? ' is-active' : ''}`}>
+              搜索
+            </NavLink>
+            <NavLink to="/documents" className={({ isActive }) => `topnav-link${isActive ? ' is-active' : ''}`}>
+              文档管理
+            </NavLink>
+          </nav>
+        </header>
+
+        <main className="page-shell">
+          <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/documents" element={<DocumentsPage />} />
+              <Route path="/documents/:id" element={<DocumentDetailPage />} />
             </Routes>
-          </Content>
-        </Layout>
-      </BrowserRouter>
-    </ConfigProvider>
+          </Suspense>
+        </main>
+      </div>
+    </BrowserRouter>
   );
 }
 
